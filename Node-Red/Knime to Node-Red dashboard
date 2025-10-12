@@ -96,20 +96,6 @@
         "groupType": "default"
     },
     {
-        "id": "f7ee20186ba463af",
-        "type": "ui-group",
-        "name": "Histórico",
-        "page": "01146f9846540800",
-        "width": "14",
-        "height": "5",
-        "order": 1,
-        "showTitle": true,
-        "className": "",
-        "visible": "true",
-        "disabled": "false",
-        "groupType": "default"
-    },
-    {
         "id": "01146f9846540800",
         "type": "ui-page",
         "name": "Histórico",
@@ -146,6 +132,20 @@
         "disabled": "false"
     },
     {
+        "id": "f7ee20186ba463af",
+        "type": "ui-group",
+        "name": "Histórico",
+        "page": "01146f9846540800",
+        "width": "14",
+        "height": "5",
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
         "id": "ae967cc3959f0113",
         "type": "http in",
         "z": "3d0c19f529e5fda4",
@@ -155,12 +155,13 @@
         "upload": false,
         "skipBodyParsing": false,
         "swaggerDoc": "",
-        "x": 120,
-        "y": 100,
+        "x": 130,
+        "y": 180,
         "wires": [
             [
                 "04b9450fd57e19be",
-                "6874f77c707dda33"
+                "6874f77c707dda33",
+                "0de513b8d3fcc242"
             ]
         ]
     },
@@ -172,7 +173,7 @@
         "property": "payload",
         "action": "obj",
         "pretty": false,
-        "x": 400,
+        "x": 360,
         "y": 80,
         "wires": [
             [
@@ -192,8 +193,8 @@
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 350,
-        "y": 200,
+        "x": 310,
+        "y": 300,
         "wires": [
             [
                 "c15a8b183952573c"
@@ -207,24 +208,24 @@
         "name": "",
         "statusCode": "",
         "headers": {},
-        "x": 530,
-        "y": 220,
+        "x": 470,
+        "y": 380,
         "wires": []
     },
     {
         "id": "2997682d8cc1c03f",
         "type": "function",
         "z": "3d0c19f529e5fda4",
-        "name": "mapear arrays e gauges",
-        "func": "// IN: msg.payload = array de objetos { values, MeasuredGas, readStart, ... }\nif (typeof msg.payload === 'string') msg.payload = JSON.parse(msg.payload);\nconst arr = Array.isArray(msg.payload) ? msg.payload : [];\n\n// ---- agrupar por gás e mapear para {x,y} ----\nconst byGas = {};\nfor (const r of arr) {\n  const gas = String(r.MeasuredGas || r.parameter || '').toUpperCase();\n  const x = Date.parse(r.readStart || r.datetime || r.date || r.time);\n  const y = Number((r.values ?? r.value ?? '').toString().replace(',', '.'));\n  if (!Number.isFinite(x) || !Number.isFinite(y) || !gas) continue;\n  (byGas[gas] ||= []).push({ x, y });\n}\nfor (const g in byGas) byGas[g].sort((a,b)=>a.x-b.x);\n\n// ---------- GAUGES (último de hoje, sem downsample) ----------\nconst now = new Date();\nconst start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();\nconst end   = start + 86400000;\n\nconst gaugeMsgs = [];\nfor (const [gas, pts] of Object.entries(byGas)) {\n  const todays = pts.filter(p => p.x >= start && p.x < end);\n  if (todays.length) gaugeMsgs.push({ topic: gas, payload: todays.at(-1).y });\n}\n\n// ---------- CHARTS (downsample p/ leveza) ----------\nconst MAX = msg.maxPoints ?? flow.get('chartMaxPoints') ?? 3000; // ajustável via msg/flow\nfunction downsample(pts, max = 3000) {\n  if (pts.length <= max) return pts; // já ordenados\n  const step = Math.ceil(pts.length / max);\n  const out = [];\n  for (let i = 0; i < pts.length; i += step) out.push(pts[i]);\n  return out;\n}\nconst chartMsgs = Object.entries(byGas).map(([gas, pts]) => ({\n  topic: gas,\n  payload: downsample(pts, MAX)\n}));\n\n// ---------- STATS 2 anos (ignora zeros) + EAQI ----------\nconst TWO_YEARS = 730 * 24 * 3600 * 1000;\nconst cut = Date.now() - TWO_YEARS;\n\n// limiar para considerar \"não-zero\"\nconst MIN_POS = 0; // muda para 0.1 se quiseres ignorar quase-zeros\n\nfunction minmaxNonZero(pts) {\n  const w = pts.filter(p => p.x >= cut && Number.isFinite(p.y) && p.y > MIN_POS);\n  if (!w.length) return null;\n  let min = w[0], max = w[0];\n  for (const p of w) { if (p.y < min.y) min = p; if (p.y > max.y) max = p; }\n  return {\n    min: min.y, minISO: new Date(min.x).toISOString(),\n    max: max.y, maxISO: new Date(max.x).toISOString(),\n    count: w.length\n  };\n}\n\n// EAQI thresholds (PM10 = média 24h, NO2 = 1h)\nconst EAQI = {\n  PM10: [0, 10, 20, 25, 50, 75, 800],     // 6 bandas + teto\n  NO2:  [0, 40, 90, 120, 230, 340, 1000]\n};\nconst LABELS = ['Boa','Ok','Moderada','Má','Muito Má','Extremamente Má'];\n\nfunction eIndex(val, limits) {\n  if (val == null || !Number.isFinite(val)) return null;\n  for (let i = 0; i < limits.length - 1; i++) {\n    if (val < limits[i + 1]) return { level: i + 1, label: LABELS[i] };\n  }\n  return { level: 6, label: LABELS[5] };\n}\n\n// PM10: média 24h (também a filtrar zeros se quiseres)\nconst t24 = Date.now() - 24 * 3600 * 1000;\nconst pm10_24h_vals = (byGas.PM10 || [])\n  .filter(p => p.x >= t24 && p.y > MIN_POS)\n  .map(p => p.y);\nconst pm10_avg24 = pm10_24h_vals.length\n  ? pm10_24h_vals.reduce((a, b) => a + b, 0) / pm10_24h_vals.length\n  : null;\n\n// NO2: último valor (1h)\nconst no2_last = (byGas.NO2 || []).at(-1)?.y ?? null;\n\n// construir stats\nconst stats = {\n  windowDays: 730,\n  PM10: minmaxNonZero(byGas.PM10 || []) || {},\n  NO2:  minmaxNonZero(byGas.NO2  || []) || {},\n  now:  { PM10_24h_avg: pm10_avg24, NO2_1h: no2_last },\n  eaqi: {\n    PM10: eIndex(pm10_avg24, EAQI.PM10),\n    NO2:  eIndex(no2_last,  EAQI.NO2)\n  }\n};\n// índice combinado = pior dos dois\nconst levels = [stats.eaqi.PM10?.level || 0, stats.eaqi.NO2?.level || 0];\nconst worst  = Math.max(...levels);\nstats.eaqi.combined = worst ? { level: worst, label: LABELS[worst - 1] } : null;\n\n// 3ª saída com stats\nconst statsMsg = { topic: 'STATS', payload: stats };\n\n// debug\nnode.warn({minmax: {PM10: stats.PM10, NO2: stats.NO2}, eaqi: stats.eaqi});\n\n// devolver: 1) charts  2) gauges  3) stats\nreturn [chartMsgs, gaugeMsgs, statsMsg];\n",
+        "name": "mapear arrays e gauges e calcular o texto",
+        "func": "// recebe msg.payload = array de objetos { values, MeasuredGas, readStart, ... }\n\nconst arr = Array.isArray(msg.payload) ? msg.payload : [];\n\n// ---- agrupar por gás e mapear para {x,y} ----\nconst byGas = {};\nfor (const r of arr) {\n  const gas = String(r.MeasuredGas || r.parameter || '').toUpperCase();\n  const x = Date.parse(r.readStart || r.datetime || r.date || r.time);\n  const y = Number((r.values ?? r.value ?? '').toString().replace(',', '.'));\n  if (!Number.isFinite(x) || !Number.isFinite(y) || !gas) continue;\n  (byGas[gas] ||= []).push({ x, y });\n}\nfor (const g in byGas) byGas[g].sort((a,b)=>a.x-b.x);\n\n// ---------- GAUGES (último de hoje, sem downsample) ----------\nconst nowTs = Date.now();\nconst winMs = msg.gaugeWindowMs ?? 24*3600*1000; \nconst since = nowTs - winMs;\n\nconst gaugeMsgs = [];\nfor (const [gas, pts] of Object.entries(byGas)) {\n  const w = pts.filter(p => p.x >= since && Number.isFinite(p.y));\n  let val = w.at(-1)?.y ?? pts.at(-1)?.y ?? null; // se 24h vazio, usa último disponível\n  if (Number.isFinite(val)) gaugeMsgs.push({ topic: gas, payload: val });\n}\n\n// ---------- CHARTS (downsample p/ leveza) ----------\nconst MAX = msg.maxPoints ?? flow.get('chartMaxPoints') ?? 3000; // ajustável via msg/flow\nfunction downsample(pts, max = 3000) {\n  if (pts.length <= max) return pts;\n  const step = Math.ceil(pts.length / max);\n  const out = [];\n  for (let i = 0; i < pts.length; i += step) out.push(pts[i]);\n  return out;\n}\nconst chartMsgs = Object.entries(byGas).map(([gas, pts]) => ({\n  topic: gas,\n  payload: downsample(pts, MAX)\n}));\n\n// ---------- STATS 2 anos (ignora zeros) + EAQI ----------\nconst TWO_YEARS = 730 * 24 * 3600 * 1000;\nconst cut = Date.now() - TWO_YEARS;\n\n// limiar para considerar \"não-zero\"\nconst MIN_POS = 0; \n\nfunction minmax(pts) {\n  const w = pts.filter(p => p.x >= cut && Number.isFinite(p.y) && p.y > MIN_POS);\n  if (!w.length) return null;\n  let min = w[0], max = w[0];\n  for (const p of w) { if (p.y < min.y) min = p; if (p.y > max.y) max = p; }\n  return {\n    min: min.y, minISO: new Date(min.x).toISOString(),\n    max: max.y, maxISO: new Date(max.x).toISOString(),\n    count: w.length\n  };\n}\n\n// EAQI thresholds\n\nconst EAQI = {\n  PM10: [0, 20, 40, 50, 100, 150, 1200],    \n  NO2:  [0, 40, 90, 120, 230, 340, 1000]\n};\nconst LABELS = ['Muito Boa','Boa','Moderada','Má','Muito Má','Extremamente Má'];\n\nfunction eIndex(val, limits) {\n  if (val == null || !Number.isFinite(val)) return null;\n  for (let i = 0; i < limits.length - 1; i++) {\n    if (val < limits[i + 1]) return { level: i + 1, label: LABELS[i] };\n  }\n  return { level: 6, label: LABELS[5] };\n}\n\n// PM10: média 24h\nconst t24 = Date.now() - 24 * 3600 * 1000;\nconst pm10_24h_vals = (byGas.PM10 || [])\n  .filter(p => p.x >= t24 && p.y > MIN_POS)\n  .map(p => p.y);\nconst pm10_avg24 = pm10_24h_vals.length\n  ? pm10_24h_vals.reduce((a, b) => a + b, 0) / pm10_24h_vals.length\n  : null;\n\n// NO2: último valor (1h)\nconst no2_last = (byGas.NO2 || []).at(-1)?.y ?? null;\n\n// construir stats\nconst stats = {\n  windowDays: 730,\n  PM10: minmax(byGas.PM10 || []) || {},\n  NO2:  minmax(byGas.NO2  || []) || {},\n  now:  { PM10_24h_avg: pm10_avg24, NO2_1h: no2_last },\n  eaqi: {\n    PM10: eIndex(pm10_avg24, EAQI.PM10),\n    NO2:  eIndex(no2_last,  EAQI.NO2)\n  }\n};\n// índice combinado = pior dos dois\nconst levels = [stats.eaqi.PM10?.level || 0, stats.eaqi.NO2?.level || 0];\nconst worst  = Math.max(...levels);\nstats.eaqi.combined = worst ? { level: worst, label: LABELS[worst - 1] } : null;\n\n// 3ª saída com stats\nconst statsMsg = { topic: 'STATS', payload: stats };\n\n\n// devolver: 1) charts  2) gauges  3) stats\nreturn [chartMsgs, gaugeMsgs, statsMsg];\n",
         "outputs": 3,
         "timeout": "",
         "noerr": 0,
         "initialize": "",
         "finalize": "",
         "libs": [],
-        "x": 650,
-        "y": 120,
+        "x": 600,
+        "y": 180,
         "wires": [
             [
                 "8f25018204478a4d",
@@ -264,11 +265,11 @@
         "checkall": "true",
         "repair": false,
         "outputs": 2,
-        "x": 940,
+        "x": 920,
         "y": 160,
         "wires": [
             [
-                "97a0ec0fe4f5029a"
+                "68239c6ca5134c3d"
             ],
             [
                 "2f21e0199a049428"
@@ -288,35 +289,53 @@
         "height": "4",
         "gtype": "gauge-half",
         "gstyle": "needle",
-        "title": "No2 Atual",
+        "title": "NO₂ Atual",
         "alwaysShowTitle": false,
         "floatingTitlePosition": "top-left",
-        "units": "units",
+        "units": "µg/m³",
         "icon": "",
         "prefix": "",
         "suffix": "",
         "segments": [
             {
                 "from": "0",
-                "color": "#5cd65c",
+                "color": "#00ad00",
                 "text": "",
                 "textType": "label"
             },
             {
                 "from": "40",
-                "color": "#ffc800",
+                "color": "#baf43e",
                 "text": "",
                 "textType": "label"
             },
             {
-                "from": "200",
+                "from": "90",
+                "color": "#ffea00",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "120",
+                "color": "#f4852a",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "230",
                 "color": "#ea5353",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "340",
+                "color": "#8a000e",
                 "text": "",
                 "textType": "label"
             }
         ],
         "min": 0,
-        "max": "400",
+        "max": "500",
         "sizeThickness": 16,
         "sizeGap": 4,
         "sizeKeyThickness": 8,
@@ -330,66 +349,12 @@
         ]
     },
     {
-        "id": "97a0ec0fe4f5029a",
-        "type": "ui-gauge",
-        "z": "3d0c19f529e5fda4",
-        "name": "pm10",
-        "group": "a41433c22f08c4ae",
-        "order": 2,
-        "value": "payload",
-        "valueType": "msg",
-        "width": "6",
-        "height": "4",
-        "gtype": "gauge-half",
-        "gstyle": "needle",
-        "title": "PM10 Atual",
-        "alwaysShowTitle": false,
-        "floatingTitlePosition": "top-left",
-        "units": "units",
-        "icon": "",
-        "prefix": "",
-        "suffix": "",
-        "segments": [
-            {
-                "from": "0",
-                "color": "#5cd65c",
-                "text": "",
-                "textType": "label"
-            },
-            {
-                "from": "40",
-                "color": "#ffc800",
-                "text": "",
-                "textType": "label"
-            },
-            {
-                "from": "50",
-                "color": "#ea5353",
-                "text": "",
-                "textType": "label"
-            }
-        ],
-        "min": 0,
-        "max": "100",
-        "sizeThickness": 16,
-        "sizeGap": 4,
-        "sizeKeyThickness": 8,
-        "styleRounded": true,
-        "styleGlow": false,
-        "className": "",
-        "x": 1170,
-        "y": 280,
-        "wires": [
-            []
-        ]
-    },
-    {
         "id": "9bc12f907793296e",
         "type": "ui-chart",
         "z": "3d0c19f529e5fda4",
         "group": "f7ee20186ba463af",
         "name": "Histórico no2",
-        "label": "Histórico No2",
+        "label": "Histórico NO₂",
         "order": 5,
         "chartType": "line",
         "category": "topic",
@@ -449,16 +414,17 @@
         "id": "8f25018204478a4d",
         "type": "debug",
         "z": "3d0c19f529e5fda4",
-        "name": "debug 1",
+        "name": "x e y do grafico",
         "active": true,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
-        "complete": "false",
+        "complete": "payload",
+        "targetType": "msg",
         "statusVal": "",
         "statusType": "auto",
-        "x": 760,
-        "y": 500,
+        "x": 800,
+        "y": 620,
         "wires": []
     },
     {
@@ -545,7 +511,7 @@
         "checkall": "true",
         "repair": false,
         "outputs": 2,
-        "x": 940,
+        "x": 920,
         "y": 100,
         "wires": [
             [
@@ -613,7 +579,7 @@
         "width": "2",
         "height": "1",
         "name": "",
-        "label": "No2 Mínimo",
+        "label": "NO₂ Mínimo",
         "format": "{{msg.payload}}",
         "layout": "col-center",
         "style": false,
@@ -637,7 +603,7 @@
         "width": "2",
         "height": "1",
         "name": "",
-        "label": "No2 Máximo",
+        "label": "NO₂ Máximo",
         "format": "{{msg.payload}}",
         "layout": "col-center",
         "style": false,
@@ -672,12 +638,101 @@
         "className": "",
         "value": "payload.eaqi.combined.label",
         "valueType": "msg",
-        "x": 1030,
-        "y": 740,
+        "x": 1070,
+        "y": 640,
         "wires": []
     },
     {
-        "id": "4628aba2812f046f",
+        "id": "68239c6ca5134c3d",
+        "type": "ui-gauge",
+        "z": "3d0c19f529e5fda4",
+        "name": "PM10",
+        "group": "a41433c22f08c4ae",
+        "order": 3,
+        "value": "payload",
+        "valueType": "msg",
+        "width": "6",
+        "height": "4",
+        "gtype": "gauge-half",
+        "gstyle": "needle",
+        "title": "PM10 Atual",
+        "alwaysShowTitle": false,
+        "floatingTitlePosition": "top-left",
+        "units": "µg/m³",
+        "icon": "",
+        "prefix": "",
+        "suffix": "",
+        "segments": [
+            {
+                "from": "0",
+                "color": "#00ad00",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "20",
+                "color": "#baf43e",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "40",
+                "color": "#ffea00",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "50",
+                "color": "#f4852a",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "100",
+                "color": "#ea5353",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "150",
+                "color": "#8a000e",
+                "text": "",
+                "textType": "label"
+            }
+        ],
+        "min": 0,
+        "max": "400",
+        "sizeThickness": 16,
+        "sizeGap": 4,
+        "sizeKeyThickness": 8,
+        "styleRounded": true,
+        "styleGlow": false,
+        "className": "",
+        "x": 1170,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "0de513b8d3fcc242",
+        "type": "debug",
+        "z": "3d0c19f529e5fda4",
+        "name": "debug dados recebidos",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 330,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "78328b28ba4429a3",
         "type": "global-config",
         "env": [],
         "modules": {
