@@ -45,3 +45,6 @@ Em cada nó que escreve ficheiros (*CSV/JSON Writer*), define o caminho onde que
 Exemplo:
 - **macOS/Linux:** `/Users/<o_teu_utilizador>/Projetos/openaq/logs/`
 - **Windows:** `C:\Users\<o_teu_utilizador>\Projetos\openaq\logs\`
+
+## 6) Executar a workflow no botão do Knime
+  
