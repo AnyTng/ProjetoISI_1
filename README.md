@@ -39,13 +39,28 @@ A *Dashboard* fica em: [http://localhost:1880/dashboard](http://localhost:1880/d
 
 ---
 
-## 5) Escolher o caminho dos logs (ficheiros) — KNIME
+## 5) Abrir os Projetos nos devidos programas
+
+Node Red:
+
+1. Copia o JSON
+2. na interface gráfica do Node-Red vai a Importar > Clipboard
+3. Cola o JSON
+4. Seleciona New Flow
+5. Carrega em OK
+
+Knime:
+
+1. Abre o ficheiro .Knwf com o Knime
+
+
+## 6) Escolher o caminho dos logs (ficheiros) — KNIME
 
 Em cada nó que escreve ficheiros (*CSV/JSON Writer*), define o caminho onde queres guardar os logs.  
 Exemplo:
 - **macOS/Linux:** `/Users/<o_teu_utilizador>/Projetos/openaq/logs/`
 - **Windows:** `C:\Users\<o_teu_utilizador>\Projetos\openaq\logs\`
 
-## 6) Executar a workflow no botão do Knime
+## 7) Executar a workflow no botão do Knime
 
 Este passo é autoexplicativo :] 
