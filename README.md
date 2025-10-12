@@ -47,4 +47,5 @@ Exemplo:
 - **Windows:** `C:\Users\<o_teu_utilizador>\Projetos\openaq\logs\`
 
 ## 6) Executar a workflow no botão do Knime
-  
+
+Este passo é autoexplicativo :] 
