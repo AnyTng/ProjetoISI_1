@@ -1,0 +1,65 @@
+{
+  "meta" : {
+    "name" : "openaq-api",
+    "website" : "/",
+    "page" : 1,
+    "limit" : 100,
+    "found" : 1
+  },
+  "results" : [ {
+    "id" : 25346,
+    "name" : "no2 µg/m³",
+    "parameter" : {
+      "id" : 5,
+      "name" : "no2",
+      "units" : "µg/m³",
+      "displayName" : "NO₂ mass"
+    },
+    "datetimeFirst" : {
+      "utc" : "2017-09-25T23:00:00Z",
+      "local" : "2017-09-26T00:00:00+01:00"
+    },
+    "datetimeLast" : {
+      "utc" : "2025-10-13T00:00:00Z",
+      "local" : "2025-10-13T01:00:00+01:00"
+    },
+    "coverage" : {
+      "expectedCount" : 1,
+      "expectedInterval" : "01:00:00",
+      "observedCount" : 47401,
+      "observedInterval" : "47401:00:00",
+      "percentComplete" : 4740100.0,
+      "percentCoverage" : 4740100.0,
+      "datetimeFrom" : {
+        "utc" : "2017-09-25T23:00:00Z",
+        "local" : "2017-09-26T00:00:00+01:00"
+      },
+      "datetimeTo" : {
+        "utc" : "2025-10-13T00:00:00Z",
+        "local" : "2025-10-13T01:00:00+01:00"
+      }
+    },
+    "latest" : {
+      "datetime" : {
+        "utc" : "2025-10-13T00:00:00Z",
+        "local" : "2025-10-13T01:00:00+01:00"
+      },
+      "value" : 46.6,
+      "coordinates" : {
+        "latitude" : 41.549722000175315,
+        "longitude" : -8.405833000419557
+      }
+    },
+    "summary" : {
+      "min" : -1.0,
+      "q02" : null,
+      "q25" : null,
+      "median" : null,
+      "q75" : null,
+      "q98" : null,
+      "max" : 607.1,
+      "avg" : 35.95725851547495,
+      "sd" : null
+    }
+  } ]
+}
