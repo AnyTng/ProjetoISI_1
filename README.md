@@ -56,10 +56,10 @@ Knime:
 
 ## 6) Escolher o caminho dos logs (ficheiros) — KNIME
 
-Em cada nó que escreve ficheiros (*CSV/JSON Writer*), define o caminho onde queres guardar os logs.  
+Em cada nó que escreve ficheiros (*CSV/JSON Writer*), define o caminho onde quer guardar os logs.  
 Exemplo:
-- **macOS/Linux:** `/Users/<o_teu_utilizador>/Projetos/openaq/logs/`
-- **Windows:** `C:\Users\<o_teu_utilizador>\Projetos\openaq\logs\`
+- **macOS/Linux:** `/Users/<user>/Projetos/ProjetoISI_1/Data/Out/Logs`
+- **Windows:** `C:\Users\<user>\Projetos\ProjetoISI_1\Data\Out\Logs\`
 
 ## 7) Executar a workflow no botão do Knime
 
